@@ -9,13 +9,9 @@ use std::io::Result;
 
 use actix_web::{web, App, HttpServer};
 
-
-use crate::database::connection;
-
 #[actix_rt::main]
 async fn main() -> Result<()> {
     set_var("RUST_LOG", "actix_web=debug");
-    connection::db_connection();
     HttpServer::new(move || {
         App::new()
             .route("/users", web::get().to(handlers::get_users))

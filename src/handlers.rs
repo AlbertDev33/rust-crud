@@ -1,65 +1,52 @@
-use actix_web::{web, Responder};
-use diesel::insert_into;
+use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
 use futures::future;
-use serde::{Deserialize, Serialize};
-use std::{thread, time::Instant};
 use uuid::Uuid;
 
-use crate::database::models::new_user::NewUser;
-use crate::database::schemas::users::users;
-use crate::database::{connection, models::user::User, schemas::users::users::dsl::*};
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InputUser {
-    pub first_name: String,
-    pub last_name: String,
-    pub email: String,
+use crate::database::models::new_user::{InputUser, NewUser};
+use crate::database::models::update_user::{UpdateUser, UpdateUserProps};
+use crate::database::operations::delete_user::delete_user;
+use crate::database::operations::get_user_by_id::get_user_by_id;
+use crate::database::operations::{create_user::create_user, update_user::update_user};
+use crate::database::{connection, models::user::User, schemas::users_table::users::dsl::*};
+
+pub async fn get_users() -> HttpResponse {
+    let db_connection = &mut connection::db_connection().await;
+    let user_list = future::lazy(|_| {
+        let user_list: Vec<User> = users
+            .select((id, first_name, last_name, email, created_at, updated_at))
+            .filter(deleted_at.is_null())
+            .load::<User>(db_connection)
+            .expect("Error");
+        return user_list;
+    })
+    .await;
+    return HttpResponse::Ok().json(user_list);
 }
 
-pub async fn get_users() -> web::Json<Vec<User>> {
-    let db_connection = connection::db_connection();
-    let user_list = users
-        .select((id, first_name, last_name, email, created_at, updated_at))
-        .load(&db_connection)
-        .expect("Error");
-    return web::Json(user_list);
+pub async fn get_user_by_id_request(user_id: web::Path<String>) -> HttpResponse {
+    let parsed_user_id = Uuid::parse_str(&user_id).unwrap();
+
+    let user = get_user_by_id(parsed_user_id).await;
+    return HttpResponse::Ok().json2(&user);
 }
 
-pub async fn get_user_by_id() -> impl Responder {
-    format!("Hello from get users by id")
+pub async fn update_user_request(user_props: web::Json<UpdateUser>) -> HttpResponse {
+    let user_props = user_props.into_inner();
+
+    let upuser = UpdateUserProps {
+        id: user_props.id,
+        first_name: user_props.first_name,
+        last_name: user_props.last_name,
+        email: user_props.email,
+        updated_at: chrono::Local::now().naive_local(),
+    };
+
+    let updated_user = update_user(upuser).await;
+    return HttpResponse::Ok().json(updated_user);
 }
 
-// pub async fn add_user(user: web::Json<InputUser>) -> web::Json<NewUser> {
-//     let start = Instant::now();
-//     let db_connection = connection::db_connection();
-
-//     let new_user = NewUser {
-//         id: Uuid::new_v4(),
-//         first_name: String::from(&user.first_name),
-//         last_name: String::from(&user.last_name),
-//         email: String::from(&user.email),
-//         created_at: chrono::Local::now().naive_local(),
-//         updated_at: chrono::Local::now().naive_local(),
-//     };
-//     let new_user_copy = new_user.clone();
-//     println!("Inicio da thread");
-//     thread::spawn(move || {
-//         insert_into(users::table)
-//             .values(&new_user)
-//             .execute(&db_connection)
-//             .unwrap();
-//         println!("Dentro da thread");
-//     });
-//     let duration = start.elapsed();
-//     println!("Fim da thread");
-//     println!("Time {duration:?}");
-//     return web::Json(new_user_copy);
-// }
-
-pub async fn add_user(user: web::Json<InputUser>) -> web::Json<NewUser> {
-    let start = Instant::now();
-    let db_connection = connection::db_connection();
-
+pub async fn create_user_request(user: web::Json<InputUser>) -> HttpResponse {
     let new_user = NewUser {
         id: Uuid::new_v4(),
         first_name: String::from(&user.first_name),
@@ -69,53 +56,13 @@ pub async fn add_user(user: web::Json<InputUser>) -> web::Json<NewUser> {
         updated_at: chrono::Local::now().naive_local(),
     };
     let new_user_copy = new_user.clone();
-    println!("Inicio da future");
-    future::lazy(|cx| {
-        insert_into(users::table)
-            .values(&new_user)
-            .execute(&db_connection)
-            .unwrap();
-        println!("Dentro da future");
-    })
-    .await;
-    println!("Fim da future");
-    // thread::spawn(move || {
-
-    // });
-    let duration = start.elapsed();
-    println!("Time {duration:?}");
-    return web::Json(new_user_copy);
+    create_user(new_user).await;
+    return HttpResponse::Ok().json(new_user_copy);
 }
 
-// pub async fn add_user(user: web::Json<InputUser>) -> web::Json<User> {
-//     let start = Instant::now();
-//     let db_connection = connection::db_connection();
-//     let new_user = NewUser {
-//         id: Uuid::new_v4(),
-//         first_name: String::from(&user.first_name),
-//         last_name: String::from(&user.last_name),
-//         email: String::from(&user.email),
-//         created_at: chrono::Local::now().naive_local(),
-//         updated_at: chrono::Local::now().naive_local(),
-//     };
-//     let user = insert_into(users::table)
-//         .values(&new_user)
-//         .returning((
-//             users::id,
-//             users::first_name,
-//             users::last_name,
-//             users::email,
-//             users::created_at,
-//             users::updated_at,
-//         ))
-//         .get_result(&db_connection)
-//         .unwrap_or_else(|_| panic!("Error connecting to"));
+pub async fn delete_user_request(user_id: web::Path<String>) -> HttpResponse {
+    let parse_user_id = Uuid::parse_str(&user_id).expect("Isn't uuid valid");
+    delete_user(parse_user_id).await;
 
-//     let duration = start.elapsed();
-//     println!("Time {duration:?}");
-//     return web::Json(user);
-// }
-
-pub async fn delete_user() -> impl Responder {
-    format!("Hello from delete user")
+    return HttpResponse::Ok().json("Deleted");
 }

@@ -8,6 +8,6 @@ table! {
         email -> VarChar,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
-        deleted_at -> Option<Timestamptz>,
+        deleted_at -> Timestamptz,
     }
 }

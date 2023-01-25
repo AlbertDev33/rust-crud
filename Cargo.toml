@@ -10,7 +10,7 @@ actix-web = "2.0.0"
 actix-web-httpauth = "0.8.0"
 chrono = { version = "0.4.10", features = ["serde"] }
 derive_more = "0.99.2"
-diesel = { version = "1.4.6", features = ["postgres", "serde_json", "r2d2", "uuidv07", "chrono"] }
+diesel = { version = "^2.0.2", features = ["postgres", "serde_json", "r2d2", "uuid", "chrono"] }
 # diesel-async = { version = "0.2.0", features = ["postgres"] }
 dotenv = "0.15.0"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }

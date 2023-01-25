@@ -5,3 +5,7 @@
 - Ensure that the cargo package manager is istalled;
 - Run "cargo run";
 - The server will come up on port 3003.
+
+## Environment variables
+
+The environments variable can be found in the **.env** file. Fill in with your data.

@@ -2,6 +2,10 @@ use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
 use futures::future;
 use uuid::Uuid;
+use pbkdf2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Pbkdf2,
+};
 
 use crate::database::models::new_user::{InputUser, NewUser};
 use crate::database::models::update_user::{UpdateUser, UpdateUserProps};
@@ -47,11 +51,16 @@ pub async fn update_user_request(user_props: web::Json<UpdateUser>) -> HttpRespo
 }
 
 pub async fn create_user_request(user: web::Json<InputUser>) -> HttpResponse {
+    let salt = SaltString::generate(&mut OsRng);
+    let user_password = user.password.as_bytes();
+    let password_hash = Pbkdf2.hash_password(user_password, &salt).expect("Password encrypt error").to_string();
+
     let new_user = NewUser {
         id: Uuid::new_v4(),
         first_name: String::from(&user.first_name),
         last_name: String::from(&user.last_name),
         email: String::from(&user.email),
+        password: password_hash,
         created_at: chrono::Local::now().naive_local(),
         updated_at: chrono::Local::now().naive_local(),
     };

@@ -6,6 +6,7 @@ table! {
         first_name -> VarChar,
         last_name -> VarChar,
         email -> VarChar,
+        password -> VarChar,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         deleted_at -> Timestamptz,
